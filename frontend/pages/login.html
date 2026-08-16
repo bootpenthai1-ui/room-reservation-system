@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>เข้าสู่ระบบ | ระบบจองห้องออนไลน์</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <div id="navbar" class="navbar"></div>
+
+  <div class="container">
+    <div class="card form-narrow">
+      <div class="page-header">
+        <h1>เข้าสู่ระบบ</h1>
+        <p>เข้าสู่ระบบเพื่อจองห้องเรียน ห้องประชุม และห้องปฏิบัติการ</p>
+      </div>
+
+      <div id="alertBox" class="hidden"></div>
+
+      <form id="loginForm">
+        <div class="field">
+          <label for="email">อีเมล</label>
+          <input type="email" id="email" required />
+        </div>
+        <div class="field">
+          <label for="password">รหัสผ่าน</label>
+          <input type="password" id="password" required />
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">เข้าสู่ระบบ</button>
+      </form>
+
+      <p style="text-align:center; margin-top:18px; font-size:0.9rem; color: var(--color-muted);">
+        ยังไม่มีบัญชี? <a href="/pages/register.html">สมัครสมาชิก</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/main.js"></script>
+  <script>
+    renderNavbar("login");
+
+    const form = document.getElementById("loginForm");
+    const alertBox = document.getElementById("alertBox");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      alertBox.classList.add("hidden");
+
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      try {
+        const data = await apiRequest("/auth/login", { method: "POST", body: { email, password } });
+        setSession(data.token, data.user);
+        window.location.href = "/pages/rooms.html";
+      } catch (err) {
+        showAlert(alertBox, err.message);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>จัดการระบบ | ระบบจองห้องออนไลน์</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <div id="navbar" class="navbar"></div>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>แดชบอร์ดผู้ดูแลระบบ</h1>
+      <p>จัดการข้อมูลอาคาร ห้อง และผู้ใช้งานทั้งหมดในระบบ</p>
+    </div>
+
+    <div class="tabs">
+      <button class="active" data-tab="buildings" onclick="switchTab('buildings')">อาคาร</button>
+      <button data-tab="rooms" onclick="switchTab('rooms')">ห้อง</button>
+      <button data-tab="users" onclick="switchTab('users')">ผู้ใช้งาน</button>
+    </div>
+
+    <div id="alertBox" class="hidden"></div>
+
+    <!-- Buildings -->
+    <div id="buildingsTab">
+      <div class="card" style="margin-bottom:20px;">
+        <h3>เพิ่มอาคารใหม่</h3>
+        <form id="buildingForm" class="grid grid-cols-3" style="align-items:end;">
+          <div class="field"><label>ชื่ออาคาร</label><input type="text" id="b_name" required /></div>
+          <div class="field"><label>ที่ตั้ง</label><input type="text" id="b_location" /></div>
+          <button type="submit" class="btn btn-primary">เพิ่มอาคาร</button>
+        </form>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ชื่ออาคาร</th><th>ที่ตั้ง</th><th></th></tr></thead>
+          <tbody id="buildingRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Rooms -->
+    <div id="roomsTab" class="hidden">
+      <div class="card" style="margin-bottom:20px;">
+        <h3>เพิ่มห้องใหม่</h3>
+        <form id="roomForm" class="grid grid-cols-3" style="align-items:end;">
+          <div class="field">
+            <label>อาคาร</label>
+            <select id="r_building" required></select>
+          </div>
+          <div class="field"><label>ชื่อห้อง</label><input type="text" id="r_name" required /></div>
+          <div class="field"><label>ประเภทห้อง</label><input type="text" id="r_type" /></div>
+          <div class="field"><label>ความจุ (ที่นั่ง)</label><input type="number" id="r_capacity" min="0" /></div>
+          <div class="field">
+            <label>สถานะ</label>
+            <select id="r_status">
+              <option value="available">ว่าง</option>
+              <option value="unavailable">ไม่พร้อมใช้งาน</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">เพิ่มห้อง</button>
+        </form>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ห้อง</th><th>อาคาร</th><th>ประเภท</th><th>ความจุ</th><th>สถานะ</th><th></th></tr></thead>
+          <tbody id="roomRows"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Users -->
+    <div id="usersTab" class="hidden">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ชื่อ</th><th>อีเมล</th><th>บทบาท</th><th>สถานะ</th><th></th></tr></thead>
+          <tbody id="userRows"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/main.js"></script>
+  <script>
+    const user = requireAuth(["admin"]);
+    renderNavbar("admin-dashboard");
+
+    const alertBox = document.getElementById("alertBox");
+    let buildingsCache = [];
+
+    function switchTab(tab) {
+      document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+      ["buildings", "rooms", "users"].forEach((t) =>
+        document.getElementById(`${t}Tab`).classList.toggle("hidden", t !== tab)
+      );
+      if (tab === "rooms") loadRooms();
+      if (tab === "users") loadUsers();
+    }
+
+    // Buildings
+    async function loadBuildings() {
+      const { buildings } = await apiRequest("/buildings");
+      buildingsCache = buildings;
+
+      document.getElementById("buildingRows").innerHTML = buildings
+        .map(
+          (b) => `
+        <tr>
+          <td>${b.building_name}</td>
+          <td>${b.location || "-"}</td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteBuilding('${b._id}')">ลบ</button></td>
+        </tr>`
+        )
+        .join("");
+
+      const select = document.getElementById("r_building");
+      select.innerHTML = buildings.map((b) => `<option value="${b._id}">${b.building_name}</option>`).join("");
+    }
+
+    document.getElementById("buildingForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await apiRequest("/buildings", {
+          method: "POST",
+          body: {
+            building_name: document.getElementById("b_name").value.trim(),
+            location: document.getElementById("b_location").value.trim(),
+          },
+        });
+        e.target.reset();
+        loadBuildings();
+      } catch (err) {
+        showAlert(alertBox, err.message);
+      }
+    });
+
+    async function deleteBuilding(id) {
+      try {
+        await apiRequest(`/buildings/${id}`, { method: "DELETE" });
+        loadBuildings();
+      } catch (err) {
+        showAlert(alertBox, err.message);
+      }
+    }
+
+    // Rooms
+    async function loadRooms() {
+      const { rooms } = await apiRequest("/rooms");
+      document.getElementById("roomRows").innerHTML = rooms
+        .map(
+          (r) => `
+        <tr>
+          <td>${r.room_name}</td>
+          <td>${r.building_id ? r.building_id.building_name : "-"}</td>
+          <td>${r.room_type || "-"}</td>
+          <td>${r.capacity || "-"}</td>
+          <td>
+            <select onchange="updateRoomStatus('${r._id}', this.value)">
+              <option value="available" ${r.status === "available" ? "selected" : ""}>ว่าง</option>
+              <option value="unavailable" ${r.status === "unavailable" ? "selected" : ""}>ไม่พร้อมใช้งาน</option>
+            </select>
+          </td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteRoom('${r._id}')">ลบ</button></td>
+        </tr>`
+        )
+        .join("");
+    }
+
+    document.getElementById("roomForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      try {
+        await apiRequest("/rooms", {
+          method: "POST",
+          body: {
+            building_id: document.getElementById("r_building").value,
+            room_name: document.getElementById("r_name").value.trim(),
+            room_type: document.getElementById("r_type").value.trim(),
+            capacity: Number(document.getElementById("r_capacity").value) || 0,
+            status: document.getElementById("r_status").value,
+          },
+        });
+        e.target.reset();
+        loadRooms();
+      } catch (err) {
+        showAlert(alertBox, err.message);
+      }
+    });
+
+    async function updateRoomStatus(id, status) {
+      try {
+        await apiRequest(`/rooms/${id}`, { method: "PUT", body: { status } });
+      } catch (err) {
+        showAlert(alertBox, err.message);
+      }
+    }
+
+    async function deleteRoom(id) {
+      try {
+        await apiRequest(`/rooms/${id}`, { method: "DELETE" });
+        loadRooms();
+      } catch (err) {
+        showAlert(alertBox, err.message);
+      }
+    }
+
+    // Users
+    async function loadUsers() {
+      const { users } = await apiRequest("/users");
+      document.getElementById("userRows").innerHTML = users
+        .map(
+          (u) => `
+        <tr>
+          <td>${u.full_name}</td>
+          <td>${u.email}</td>
+          <td>${ROLE_LABELS[u.role] || u.role}</td>
+          <td>${statusBadge(u.status)}</td>
+          <td>${
+            u.status === "active"
+              ? `<button class="btn btn-danger btn-sm" onclick="suspendUser('${u._id}')">ระงับ</button>`
+              : ""
+          }</td>
+        </tr>`
+        )
+        .join("");
+    }
+
+    async function suspendUser(id) {
+      try {
+        await apiRequest(`/users/${id}`, { method: "DELETE" });
+        loadUsers();
+      } catch (err) {
+        showAlert(alertBox, err.message);
+      }
+    }
+
+    if (user) loadBuildings();
+  </script>
+</body>
+</html>

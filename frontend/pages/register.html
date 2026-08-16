@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>สมัครสมาชิก | ระบบจองห้องออนไลน์</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <div id="navbar" class="navbar"></div>
+
+  <div class="container">
+    <div class="card form-narrow">
+      <div class="page-header">
+        <h1>สมัครสมาชิก</h1>
+        <p>สำหรับนักศึกษา บุคลากรมหาวิทยาลัย และบุคคลภายนอก</p>
+      </div>
+
+      <div id="alertBox" class="hidden"></div>
+
+      <form id="registerForm">
+        <div class="field">
+          <label for="full_name">ชื่อ-นามสกุล</label>
+          <input type="text" id="full_name" required />
+        </div>
+        <div class="field">
+          <label for="email">อีเมล</label>
+          <input type="email" id="email" required />
+        </div>
+        <div class="field">
+          <label for="password">รหัสผ่าน</label>
+          <input type="password" id="password" required minlength="6" />
+        </div>
+        <div class="field">
+          <label for="phone">เบอร์โทรศัพท์</label>
+          <input type="tel" id="phone" />
+        </div>
+        <div class="field">
+          <label for="role">ประเภทผู้ใช้</label>
+          <select id="role">
+            <option value="student">นักศึกษา</option>
+            <option value="staff">บุคลากรมหาวิทยาลัย</option>
+            <option value="external">บุคคลภายนอก</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="department">คณะ/หน่วยงาน</label>
+          <input type="text" id="department" />
+        </div>
+
+        <div id="studentFields">
+          <div class="field">
+            <label for="student_id">รหัสนักศึกษา</label>
+            <input type="text" id="student_id" />
+          </div>
+          <div class="field">
+            <label for="major">สาขาวิชา</label>
+            <input type="text" id="major" />
+          </div>
+          <div class="field">
+            <label for="faculty">คณะ</label>
+            <input type="text" id="faculty" />
+          </div>
+          <div class="field">
+            <label for="academic_year">ชั้นปี</label>
+            <input type="number" id="academic_year" min="1" max="8" />
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary btn-block">สมัครสมาชิก</button>
+      </form>
+
+      <p style="text-align:center; margin-top:18px; font-size:0.9rem; color: var(--color-muted);">
+        มีบัญชีอยู่แล้ว? <a href="/pages/login.html">เข้าสู่ระบบ</a>
+      </p>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/main.js"></script>
+  <script>
+    renderNavbar("register");
+
+    const roleSelect = document.getElementById("role");
+    const studentFields = document.getElementById("studentFields");
+    roleSelect.addEventListener("change", () => {
+      studentFields.classList.toggle("hidden", roleSelect.value !== "student");
+    });
+
+    const form = document.getElementById("registerForm");
+    const alertBox = document.getElementById("alertBox");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      alertBox.classList.add("hidden");
+
+      const body = {
+        full_name: document.getElementById("full_name").value.trim(),
+        email: document.getElementById("email").value.trim(),
+        password: document.getElementById("password").value,
+        phone: document.getElementById("phone").value.trim(),
+        role: roleSelect.value,
+        department: document.getElementById("department").value.trim(),
+      };
+
+      if (roleSelect.value === "student") {
+        body.student_id = document.getElementById("student_id").value.trim();
+        body.major = document.getElementById("major").value.trim();
+        body.faculty = document.getElementById("faculty").value.trim();
+        body.academic_year = Number(document.getElementById("academic_year").value) || undefined;
+      }
+
+      try {
+        const data = await apiRequest("/auth/register", { method: "POST", body });
+        setSession(data.token, data.user);
+        window.location.href = "/pages/rooms.html";
+      } catch (err) {
+        showAlert(alertBox, err.message);
+      }
+    });
+  </script>
+</body>
+</html>

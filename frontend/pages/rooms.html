@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ห้องเรียน/ห้องประชุม | ระบบจองห้องออนไลน์</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <div id="navbar" class="navbar"></div>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>ห้องเรียน / ห้องประชุม / ห้องปฏิบัติการ</h1>
+      <p>เลือกอาคารและห้องที่ต้องการจอง จากนั้นกรอกวันเวลาที่ต้องการใช้งาน</p>
+    </div>
+
+    <div class="field" style="max-width:280px; margin-bottom:24px;">
+      <label for="buildingFilter">กรองตามอาคาร</label>
+      <select id="buildingFilter">
+        <option value="">ทุกอาคาร</option>
+      </select>
+    </div>
+
+    <div id="alertBox" class="hidden"></div>
+    <div id="roomList" class="grid grid-cols-3"></div>
+    <div id="emptyState" class="empty-state hidden">ไม่พบห้องที่ตรงกับเงื่อนไข</div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/main.js"></script>
+  <script>
+    renderNavbar("rooms");
+
+    const alertBox = document.getElementById("alertBox");
+    const roomList = document.getElementById("roomList");
+    const emptyState = document.getElementById("emptyState");
+    const buildingFilter = document.getElementById("buildingFilter");
+
+    let rooms = [];
+
+    async function loadBuildings() {
+      const { buildings } = await apiRequest("/buildings");
+      buildings.forEach((b) => {
+        const opt = document.createElement("option");
+        opt.value = b._id;
+        opt.textContent = b.building_name;
+        buildingFilter.appendChild(opt);
+      });
+    }
+
+    function roomCard(room) {
+      const buildingName = room.building_id ? room.building_id.building_name : "";
+      const canBook = room.status === "available" && getUser();
+
+      return `
+        <div class="card" data-room-id="${room._id}">
+          <h3>${room.room_name}</h3>
+          <p class="meta">${buildingName}</p>
+          <p class="meta">ประเภท: ${room.room_type || "-"} · ความจุ: ${room.capacity || "-"} ที่นั่ง</p>
+          <div>${statusBadge(room.status)}</div>
+          <div class="card-actions">
+            ${
+              canBook
+                ? `<button class="btn btn-primary btn-sm" onclick="toggleBookingForm('${room._id}')">จองห้องนี้</button>`
+                : !getUser()
+                ? `<a href="/pages/login.html" class="btn btn-outline btn-sm">เข้าสู่ระบบเพื่อจอง</a>`
+                : `<span class="meta">ห้องนี้ไม่พร้อมให้บริการ</span>`
+            }
+          </div>
+          <form class="hidden" id="form-${room._id}" onsubmit="submitBooking(event, '${room._id}')" style="margin-top:14px; border-top:1px solid var(--color-border); padding-top:14px;">
+            <div class="field">
+              <label>วันที่ใช้ห้อง</label>
+              <input type="date" required name="booking_date" />
+            </div>
+            <div class="field">
+              <label>เวลาเริ่มต้น</label>
+              <input type="time" required name="start_time" />
+            </div>
+            <div class="field">
+              <label>เวลาสิ้นสุด</label>
+              <input type="time" required name="end_time" />
+            </div>
+            <div class="field">
+              <label>วัตถุประสงค์การใช้ห้อง</label>
+              <textarea name="purpose" rows="2" required></textarea>
+            </div>
+            <div class="field">
+              <label>เอกสารแนบ (ถ้ามี)</label>
+              <input type="file" name="document_file" accept=".pdf,.jpg,.jpeg,.png" />
+            </div>
+            <div id="form-alert-${room._id}" class="hidden"></div>
+            <button type="submit" class="btn btn-primary btn-block btn-sm">ยืนยันการจอง</button>
+          </form>
+        </div>
+      `;
+    }
+
+    function render() {
+      const filterVal = buildingFilter.value;
+      const filtered = filterVal ? rooms.filter((r) => r.building_id && r.building_id._id === filterVal) : rooms;
+
+      roomList.innerHTML = filtered.map(roomCard).join("");
+      emptyState.classList.toggle("hidden", filtered.length > 0);
+    }
+
+    function toggleBookingForm(roomId) {
+      const form = document.getElementById(`form-${roomId}`);
+      form.classList.toggle("hidden");
+    }
+
+    async function submitBooking(e, roomId) {
+      e.preventDefault();
+      const form = e.target;
+      const alertEl = document.getElementById(`form-alert-${roomId}`);
+      alertEl.classList.add("hidden");
+
+      const formData = new FormData(form);
+      formData.append("room_id", roomId);
+
+      try {
+        await apiRequest("/bookings", { method: "POST", body: formData, isForm: true });
+        showAlert(alertEl, "ส่งคำขอจองสำเร็จ กรุณารอการอนุมัติจากเจ้าหน้าที่", "success");
+        form.reset();
+      } catch (err) {
+        showAlert(alertEl, err.message);
+      }
+    }
+
+    buildingFilter.addEventListener("change", render);
+
+    async function init() {
+      try {
+        await loadBuildings();
+        const { rooms: data } = await apiRequest("/rooms");
+        rooms = data;
+        render();
+      } catch (err) {
+        showAlert(alertBox, err.message);
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

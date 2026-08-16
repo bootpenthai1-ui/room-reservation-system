@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>อนุมัติการจอง | ระบบจองห้องออนไลน์</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../css/style.css" />
+</head>
+<body>
+  <div id="navbar" class="navbar"></div>
+
+  <div class="container">
+    <div class="page-header">
+      <h1>แดชบอร์ดเจ้าหน้าที่ดูแลห้อง</h1>
+      <p>ตรวจสอบและอนุมัติ/ปฏิเสธคำขอจองห้อง พร้อมตรวจสอบหลักฐานการชำระเงิน</p>
+    </div>
+
+    <div class="tabs">
+      <button class="active" data-tab="bookings" onclick="switchTab('bookings')">คำขอจองห้อง</button>
+      <button data-tab="payments" onclick="switchTab('payments')">การชำระเงิน</button>
+    </div>
+
+    <div id="alertBox" class="hidden"></div>
+
+    <div id="bookingsTab">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ผู้จอง</th>
+              <th>ห้อง</th>
+              <th>วันที่/เวลา</th>
+              <th>วัตถุประสงค์</th>
+              <th>สถานะ</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="bookingRows"></tbody>
+        </table>
+      </div>
+      <div id="bookingsEmpty" class="empty-state hidden">ไม่มีคำขอจองห้อง</div>
+    </div>
+
+    <div id="paymentsTab" class="hidden">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ผู้จอง</th>
+              <th>ห้อง</th>
+              <th>จำนวนเงิน</th>
+              <th>ช่องทาง</th>
+              <th>สถานะ</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="paymentRows"></tbody>
+        </table>
+      </div>
+      <div id="paymentsEmpty" class="empty-state hidden">ไม่มีรายการชำระเงิน</div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/main.js"></script>
+  <script>
+    const user = requireAuth(["room_staff", "admin"]);
+    renderNavbar("staff-dashboard");
+
+    const alertBox = document.getElementById("alertBox");
+
+    function switchTab(tab) {
+      document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === tab));
+      document.getElementById("bookingsTab").classList.toggle("hidden", tab !== "bookings");
+      document.getElementById("paymentsTab").classList.toggle("hidden", tab !== "payments");
+      if (tab === "payments") loadPayments();
+    }
+
+    function bookingRowHtml(b) {
+      const actions =
+        b.status === "pending"
+          ? `<button class="btn btn-success btn-sm" onclick="updateStatus('${b._id}', 'approved')">อนุมัติ</button>
+             <button class="btn btn-danger btn-sm" onclick="updateStatus('${b._id}', 'rejected')">ปฏิเสธ</button>`
+          : "";
+      return `
+        <tr>
+          <td>${b.user_id ? b.user_id.full_name : "-"}</td>
+          <td>${b.room_id ? b.room_id.room_name : "-"}</td>
+          <td>${formatDate(b.booking_date)} · ${b.start_time}-${b.end_time}</td>
+          <td>${b.purpose || "-"}</td>
+          <td>${statusBadge(b.status)}</td>
+          <td>${actions}</td>
+        </tr>
+      `;
+    }
+
+    async function loadBookings() {
+      try {
+        const { bookings } = await apiRequest("/bookings?status=pending");
+        const rows = document.getElementById("bookingRows");
+        rows.innerHTML = bookings.map(bookingRowHtml).join("");
+        document.getElementById("bookingsEmpty").classList.toggle("hidden", bookings.length > 0);
+      } catch (err) {
+        showAlert(alertBox, err.message);
+      }
+    }
+
+    async function updateStatus(id, status) {
+      try {
+        await apiRequest(`/bookings/${id}/status`, { method: "PATCH", body: { status } });
+        loadBookings();
+      } catch (err) {
+        showAlert(alertBox, err.message);
+      }
+    }
+
+    function paymentRowHtml(p) {
+      const booking = p.booking_id;
+      const actions =
+        p.payment_status === "pending"
+          ? `<button class="btn btn-success btn-sm" onclick="verifyPayment('${p._id}', 'verified')">ยืนยัน</button>
+             <button class="btn btn-danger btn-sm" onclick="verifyPayment('${p._id}', 'rejected')">ปฏิเสธ</button>`
+          : "";
+      return `
+        <tr>
+          <td>${booking && booking.user_id ? booking.user_id.full_name : "-"}</td>
+          <td>${booking && booking.room_id ? booking.room_id.room_name : "-"}</td>
+          <td>${p.amount} บาท</td>
+          <td>${p.payment_method || "-"}</td>
+          <td>${statusBadge(p.payment_status)}</td>
+          <td>${actions}</td>
+        </tr>
+      `;
+    }
+
+    async function loadPayments() {
+      try {
+        const { payments } = await apiRequest("/payments");
+        const rows = document.getElementById("paymentRows");
+        rows.innerHTML = payments.map(paymentRowHtml).join("");
+        document.getElementById("paymentsEmpty").classList.toggle("hidden", payments.length > 0);
+      } catch (err) {
+        showAlert(alertBox, err.message);
+      }
+    }
+
+    async function verifyPayment(id, payment_status) {
+      try {
+        await apiRequest(`/payments/${id}/verify`, { method: "PATCH", body: { payment_status } });
+        loadPayments();
+      } catch (err) {
+        showAlert(alertBox, err.message);
+      }
+    }
+
+    if (user) loadBookings();
+  </script>
+</body>
+</html>
