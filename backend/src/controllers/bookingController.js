@@ -1,5 +1,6 @@
 const Booking = require("../models/Booking");
 const Room = require("../models/Room");
+const { uploadBufferToCloudinary } = require("../utils/cloudinaryUpload");
 
 function timeToMinutes(t) {
   const [h, m] = t.split(":").map(Number);
@@ -52,6 +53,12 @@ async function createBooking(req, res) {
       return res.status(409).json({ message: "ช่วงเวลานี้มีการจองห้องนี้ไปแล้ว" });
     }
 
+    let documentFileUrl;
+    if (req.file) {
+      const uploaded = await uploadBufferToCloudinary(req.file, "room-reservation/documents");
+      documentFileUrl = uploaded.secure_url;
+    }
+
     const booking = await Booking.create({
       user_id: req.user._id,
       room_id,
@@ -59,7 +66,7 @@ async function createBooking(req, res) {
       start_time,
       end_time,
       purpose,
-      document_file: req.file ? req.file.filename : undefined,
+      document_file: documentFileUrl,
     });
 
     res.status(201).json({ booking });

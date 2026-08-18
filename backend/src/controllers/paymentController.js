@@ -1,5 +1,6 @@
 const Payment = require("../models/Payment");
 const Booking = require("../models/Booking");
+const { uploadBufferToCloudinary } = require("../utils/cloudinaryUpload");
 
 async function createPayment(req, res) {
   try {
@@ -14,11 +15,17 @@ async function createPayment(req, res) {
       return res.status(403).json({ message: "คุณไม่มีสิทธิ์ชำระเงินสำหรับการจองนี้" });
     }
 
+    let paymentProofUrl;
+    if (req.file) {
+      const uploaded = await uploadBufferToCloudinary(req.file, "room-reservation/payments");
+      paymentProofUrl = uploaded.secure_url;
+    }
+
     const payment = await Payment.create({
       booking_id,
       amount,
       payment_method,
-      payment_proof: req.file ? req.file.filename : undefined,
+      payment_proof: paymentProofUrl,
     });
 
     res.status(201).json({ payment });
