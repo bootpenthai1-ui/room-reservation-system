@@ -140,6 +140,7 @@
     });
 
     async function deleteBuilding(id) {
+      if (!confirm("ยืนยันลบอาคารนี้? การลบไม่สามารถย้อนกลับได้")) return;
       try {
         await apiRequest(`/buildings/${id}`, { method: "DELETE" });
         loadBuildings();
@@ -200,6 +201,7 @@
     }
 
     async function deleteRoom(id) {
+      if (!confirm("ยืนยันลบห้องนี้? การลบไม่สามารถย้อนกลับได้")) return;
       try {
         await apiRequest(`/rooms/${id}`, { method: "DELETE" });
         loadRooms();
@@ -230,6 +232,7 @@
     }
 
     async function suspendUser(id) {
+      if (!confirm("ยืนยันระงับบัญชีผู้ใช้นี้? ผู้ใช้จะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดสิทธิ์คืน")) return;
       try {
         await apiRequest(`/users/${id}`, { method: "DELETE" });
         loadUsers();

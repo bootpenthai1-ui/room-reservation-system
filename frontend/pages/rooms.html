@@ -73,8 +73,9 @@
           <form class="hidden" id="form-${room._id}" onsubmit="submitBooking(event, '${room._id}')" style="margin-top:14px; border-top:1px solid var(--color-border); padding-top:14px;">
             <div class="field">
               <label>วันที่ใช้ห้อง</label>
-              <input type="date" required name="booking_date" />
+              <input type="date" required name="booking_date" oninput="loadRoomAvailability('${room._id}', this.value)" />
             </div>
+            <div id="slots-${room._id}" class="hidden" style="font-size:0.82rem; margin-bottom:14px; padding:10px 12px; background:var(--color-muted-bg); border-radius:var(--radius-sm);"></div>
             <div class="field">
               <label>เวลาเริ่มต้น</label>
               <input type="time" required name="start_time" />
@@ -109,6 +110,31 @@
     function toggleBookingForm(roomId) {
       const form = document.getElementById(`form-${roomId}`);
       form.classList.toggle("hidden");
+    }
+
+    async function loadRoomAvailability(roomId, date) {
+      const slotsEl = document.getElementById(`slots-${roomId}`);
+      if (!date) {
+        slotsEl.classList.add("hidden");
+        return;
+      }
+
+      slotsEl.classList.remove("hidden");
+      slotsEl.innerHTML = "กำลังตรวจสอบตารางเวลา...";
+
+      try {
+        const { bookings } = await apiRequest(`/rooms/${roomId}/availability?date=${date}`);
+        if (bookings.length === 0) {
+          slotsEl.innerHTML = "<strong>วันนี้ยังว่างทั้งวัน</strong> ยังไม่มีใครจองห้องนี้";
+          return;
+        }
+        const items = bookings
+          .map((b) => `${b.start_time}-${b.end_time} (${STATUS_LABELS[b.status] || b.status})`)
+          .join(", ");
+        slotsEl.innerHTML = `<strong>ช่วงเวลาที่ถูกจองแล้วในวันนี้:</strong> ${items}`;
+      } catch (err) {
+        slotsEl.innerHTML = "ตรวจสอบตารางเวลาไม่สำเร็จ";
+      }
     }
 
     async function submitBooking(e, roomId) {
